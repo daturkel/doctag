@@ -1,0 +1,1 @@
+from .tagindex import TagIndex
