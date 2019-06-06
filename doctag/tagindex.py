@@ -1,6 +1,6 @@
 import boolean
 import ujson
-from typing import DefaultDict, Union, List, Dict, Any, Tuple, Optional
+from typing import DefaultDict, Union, List, Iterable, Dict, Any, Tuple, Optional
 from collections import defaultdict
 
 
@@ -44,19 +44,28 @@ class TagIndex:
             docs = {doc for doc in self.tag_to_docs[tag]}
         return docs
 
-    def tag(self, docs: Union[str, List[str]], tags: Union[str, List[str]]):
-        docs_ = docs if isinstance(docs, list) else [docs]
-        tags_ = tags if isinstance(tags, list) else [tags]
+    def tag(self, docs: Union[str, Iterable[str]], tags: Union[str, Iterable[str]]):
+        docs_ = docs if isinstance(docs, Iterable) and not isinstance(docs,str) else [docs]
+        tags_ = tags if isinstance(tags, Iterable) and not isinstance(tags,str) else [tags]
         product = ((doc, tag) for doc in docs_ for tag in tags_)
         for doc, tag in product:
             self._tag(doc=doc, tag=tag)
 
-    def untag(self, docs: Union[str, List[str]], tags: Union[str, List[str]]):
-        docs_ = docs if isinstance(docs, list) else [docs]
-        tags_ = tags if isinstance(tags, list) else [tags]
+    def untag(self, docs: Union[str, Iterable[str]], tags: Union[str, Iterable[str]]):
+        docs_ = docs if isinstance(docs, Iterable) and not isinstance(docs,str) else [docs]
+        tags_ = tags if isinstance(tags, Iterable) and not isinstance(tags,str) else [tags]
         product = ((doc, tag) for doc in docs_ for tag in tags_)
         for doc, tag in product:
             self._untag(doc=doc, tag=tag)
+
+    def merge(self, old_tags: Union[str, Iterable[str]], new_tag: str):
+        old_tags_ = old_tags if isinstance(old_tags, list) else [old_tags]
+        for old_tag in old_tags_:
+            self._merge(old_tag=old_tag, new_tag=new_tag)
+
+    def _merge(self, old_tag: str, new_tag: str):
+        self.tag_to_docs[new_tag].add(self.tag_to_docs[old_tag])
+        self.untag(docs=self.tag_to_docs[old_tag],tags=old_tag)
 
     def to_json(self, file_name: str, compact: bool = False):
         serial = {
@@ -74,12 +83,12 @@ class TagIndex:
             serial = ujson.load(from_file)
             ti = TagIndex()
             ti.doc_to_tags.update(
-                {tag: set(docs) for tag, docs in serial["doc_to_tags"].items()}
+                {str(tag): set(docs) for tag, docs in serial["doc_to_tags"].items()}
             )
             ti.doc_tag_values = serial["doc_tag_values"]
             try:
                 ti.tag_to_docs.update(
-                    {doc: set(tags) for doc, tags in serial["tag_to_docs"].items()}
+                    {str(doc): set(tags) for doc, tags in serial["tag_to_docs"].items()}
                 )
             except KeyError:
                 for doc, tags in ti.tag_to_docs.items():
