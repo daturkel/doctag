@@ -1,6 +1,6 @@
 ---
 title: doctag
-subtitle: Parsing boolean tag queries in Python.
+subtitle: Tagging and parsing tag queries in Python
 author: Dan Turkel
 date: June 10th, 2019
 numbering: counter
@@ -207,4 +207,22 @@ The library includes a `TagIndex` class which stores the index and inverted inde
 
 \footnotetext[6]{https://github.com/esnme/ultrajson}
 
-## 
+## Features
+
+See `notebooks/features.ipynb`
+
+## Performance
+
+See `notebooks/performance.ipynb`
+
+## Query Parsing
+
+Executing queries in doctag is a two-step procses. 
+
+First, the boolean.py library parses the query string and creates an expression object that we can interpret programmatically. 
+
+Then doctag recursively performs set operations as it traverses the expression.
+
+## Links
+
+doctag is on Github: <https://github.com/daturkel/doctag>
