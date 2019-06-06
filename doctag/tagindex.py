@@ -1,4 +1,5 @@
 import boolean
+import sys
 import ujson
 from typing import DefaultDict, Union, List, Iterable, Dict, Any, Tuple, Optional
 from collections import defaultdict
@@ -45,15 +46,23 @@ class TagIndex:
         return docs
 
     def tag(self, docs: Union[str, Iterable[str]], tags: Union[str, Iterable[str]]):
-        docs_ = docs if isinstance(docs, Iterable) and not isinstance(docs,str) else [docs]
-        tags_ = tags if isinstance(tags, Iterable) and not isinstance(tags,str) else [tags]
+        docs_ = (
+            docs if isinstance(docs, Iterable) and not isinstance(docs, str) else [docs]
+        )
+        tags_ = (
+            tags if isinstance(tags, Iterable) and not isinstance(tags, str) else [tags]
+        )
         product = ((doc, tag) for doc in docs_ for tag in tags_)
         for doc, tag in product:
             self._tag(doc=doc, tag=tag)
 
     def untag(self, docs: Union[str, Iterable[str]], tags: Union[str, Iterable[str]]):
-        docs_ = docs if isinstance(docs, Iterable) and not isinstance(docs,str) else [docs]
-        tags_ = tags if isinstance(tags, Iterable) and not isinstance(tags,str) else [tags]
+        docs_ = (
+            docs if isinstance(docs, Iterable) and not isinstance(docs, str) else [docs]
+        )
+        tags_ = (
+            tags if isinstance(tags, Iterable) and not isinstance(tags, str) else [tags]
+        )
         product = ((doc, tag) for doc in docs_ for tag in tags_)
         for doc, tag in product:
             self._untag(doc=doc, tag=tag)
@@ -65,14 +74,16 @@ class TagIndex:
 
     def _merge(self, old_tag: str, new_tag: str):
         self.tag_to_docs[new_tag].add(self.tag_to_docs[old_tag])
-        self.untag(docs=self.tag_to_docs[old_tag],tags=old_tag)
+        self.untag(docs=self.tag_to_docs[old_tag], tags=old_tag)
 
-    def to_json(self, file_name: str, compact: bool = False):
-        serial = {
-            "doc_to_tags": self.doc_to_tags,
-            "doc_tag_values": self.doc_tag_values,
-        }
-        if not compact:
+    def to_json(self, file_name: str):
+        serial = {"doc_tag_values": self.doc_tag_values}
+        dtt_size = sys.getsizeof(self.doc_to_tags)
+        ttd_size = sys.getsizeof(self.tag_to_docs)
+        ttd_bigger = ttd_size >= dtt_size
+        if ttd_bigger:
+            serial["doc_to_tags"] = self.doc_to_tags
+        else:
             serial["tag_to_docs"] = self.tag_to_docs
         with open(file_name, "w") as to_file:
             ujson.dump(serial, to_file)
@@ -82,18 +93,25 @@ class TagIndex:
         with open(file_name, "r") as from_file:
             serial = ujson.load(from_file)
             ti = TagIndex()
-            ti.doc_to_tags.update(
-                {str(tag): set(docs) for tag, docs in serial["doc_to_tags"].items()}
-            )
             ti.doc_tag_values = serial["doc_tag_values"]
-            try:
-                ti.tag_to_docs.update(
-                    {str(doc): set(tags) for doc, tags in serial["tag_to_docs"].items()}
+            if "doc_to_tags" in serial.keys():
+                ti.doc_to_tags.update(
+                    {str(doc): set(tags) for doc, tags in serial["doc_to_tags"].items()}
                 )
-            except KeyError:
-                for doc, tags in ti.tag_to_docs.items():
+                for doc, tags in ti.doc_to_tags.items():
                     for tag in tags:
-                        ti.tag_to_docs[tag].add(doc)
+                        ti.tag_to_docs[str(tag)].add(doc)
+            elif "tag_to_docs" in serial.keys():
+                ti.tag_to_docs.update(
+                    {str(tag): set(docs) for tag, docs in serial["tag_to_docs"].items()}
+                )
+                for tag, docs in ti.tag_to_docs.items():
+                    for doc in docs:
+                        ti.doc_to_tags[str(doc)].add(tag)
+            else:
+                raise ValueError(
+                    "File does not contain 'tag_to_docs' or 'doc_to_tags' index."
+                )
         return ti
 
     def _tag(self, doc: str, tag: str):
