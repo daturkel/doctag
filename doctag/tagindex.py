@@ -76,6 +76,12 @@ class TagIndex:
         self.tag_to_docs[new_tag].add(self.tag_to_docs[old_tag])
         self.untag(docs=self.tag_to_docs[old_tag], tags=old_tag)
 
+    def rename_file(self, old_file_name: str, new_file_name: str):
+        if new_file_name in self.docs:
+            raise ValueError(f"Document named {new_file_name} already exists.")
+        else:
+            self.doc_to_tags[new_file_name] = self.tag_to_docs.pop(old_file_name)
+
     def to_json(self, file_name: str):
         serial = {"doc_tag_values": self.doc_tag_values}
         dtt_size = sys.getsizeof(self.doc_to_tags)
@@ -180,9 +186,8 @@ class TagIndex:
         return set.union(*sub_results)
 
     def _parse_expression_not(self, arg) -> set:
-        all_docs = set(self.doc_to_tags.keys())
         if isinstance(arg, boolean.Symbol):
             docs_with_tag = self.get_docs(arg.obj)
         else:
             docs_with_tag = self._parse_expression(operator=arg.operator, args=arg.args)
-        return all_docs - docs_with_tag
+        return self.docs - docs_with_tag
