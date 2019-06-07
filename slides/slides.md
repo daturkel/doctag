@@ -166,10 +166,10 @@ Inverted indexes are used in NLP[^3] and search[^4] for quickly finding document
 :::{.column}
 \begin{center}inverse index\end{center}
 
-| tag      | docs                   |
-|----------|------------------------|
-| list     | movies.txt, books.txt  |
-| learning | books.txt, school.txt  |
+| tag      | docs                  |
+|----------|-----------------------|
+| list     | movies.txt, books.txt |
+| learning | books.txt, school.txt |
 :::
 ::::
 
@@ -202,7 +202,6 @@ The library includes a `TagIndex` class which stores the index and inverted inde
 :::
 ::::
 
-
 \footnotetext[5]{https://github.com/bastikr/boolean.py}
 
 \footnotetext[6]{https://github.com/esnme/ultrajson}
@@ -217,11 +216,13 @@ See `notebooks/performance.ipynb`
 
 ## Query Parsing
 
-Executing queries in doctag is a two-step procses. 
+Executing queries in doctag is a two-step process.
 
-First, the boolean.py library parses the query string and creates an expression object that we can interpret programmatically. 
+First, the boolean.py library parses the query string and creates an expression object that we can interpret programmatically.
 
 Then doctag recursively performs set operations as it traverses the expression.
+
+$\land \cup \cap \lor \neg$
 
 ## Links
 
