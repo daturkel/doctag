@@ -8,7 +8,8 @@ aspectratio: 169
 header-includes:
   - \usetheme[sectionpage = simple]{metropolis}
   - \usepackage{xcolor}
-
+  - \setmathfont{Fira Math}
+  
 ---
 
 # Background
@@ -198,7 +199,9 @@ The library includes a `TagIndex` class which stores the index and inverted inde
 
 **boolean.py**^6^ is used to parse arbitrarily complex tag queries, like:
 
-\begin{center}``(list and learning) or (not work)''\end{center}
+\begin{center}
+“(list and learning) or (not work)”
+\end{center}
 :::
 ::::
 
@@ -214,15 +217,35 @@ See `notebooks/features.ipynb`
 
 See `notebooks/performance.ipynb`
 
-## Query Parsing
+## Query Parsing: Text to Expressions
 
-Executing queries in doctag is a two-step process.
+The boolean.py library turns plaintext strings with a flexible syntax into nested **expression** objects, each with one or more arguments and an optional operation. E.g. "a or b" is evaluated to 
 
-First, the boolean.py library parses the query string and creates an expression object that we can interpret programmatically.
+```python
+OR(Symbol('a'), Symbol('b'))
+```
 
-Then doctag recursively performs set operations as it traverses the expression.
+where a **symbol** is the simplest expression, having no operation at all.
 
-$\land \cup \cap \lor \neg$
+Similarly, a more complex query like "not a or (b and c)" evaluates to 
+
+```python
+OR(
+    NOT(Symbol('a')), 
+    AND(Symbol('b'), Symbol('c'))
+)
+```
+
+## Query Parsing: Expressions to Documents
+
+doctag recurses through expression arguments until it hits a bare symbol, at which point it fetches all documents tagged with that symbol. When all arguments of an operation expression are evaluated, it uses set logic to evaluate the entire expression.
+
+If we let {foo} represent the set of all documents tagged with "foo," we can follow simple set logic to parse morecomplex expressions:
+
+- "a and b" is the set intersection of {a} and {b}
+    - (with short-circuiting if {a} evaluates to the empty set)
+- "a or b" is the set union of {a} and {b}
+- "not a" is the set complement of {a} (all existing tags that are not in {a})
 
 ## Links
 
