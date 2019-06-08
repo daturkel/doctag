@@ -13,3 +13,4 @@ wheels/
 .ipynb_checkpoints
 venv/
 .mypy_cache/
+.coverage
