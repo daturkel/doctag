@@ -8,12 +8,15 @@ from collections import defaultdict
 def parse_tag(tag: str) -> Tuple[str, Optional[str]]:
     value: Optional[str]  # appease mypy
     if ":" in tag:
+        sp = tag.split(":",maxsplit=1)
         try:
-            value = tag.split(":")[1]
+            value = sp[1]
         except IndexError:
             value = None
-        tag = tag.split(":")[0]
+        tag = sp[0]
     else:
+        value = None
+    if value == "":
         value = None
     return (tag, value)
 
@@ -78,9 +81,16 @@ class TagIndex:
 
     def rename_file(self, old_file_name: str, new_file_name: str):
         if new_file_name in self.docs:
-            raise ValueError(f"Document named {new_file_name} already exists.")
+            raise ValueError(f"Document named '{new_file_name}' already exists.")
         else:
             self.doc_to_tags[new_file_name] = self.tag_to_docs.pop(old_file_name)
+
+    def remove_file(self, file_name: str):
+        if file_name not in self.docs:
+            raise ValueError(f"Document '{file_name}' not found.")
+        else:
+            self.untag(docs=file_name, tags=self.doc_to_tags[file_name])
+            del self.doc_to_tags[file_name]
 
     def to_json(self, file_name: str):
         serial = {"doc_tag_values": self.doc_tag_values}
