@@ -1,6 +1,6 @@
 ---
 title: doctag
-subtitle: Parsing boolean tag queries in Python.
+subtitle: Tagging and parsing tag queries in Python
 author: Dan Turkel
 date: June 10th, 2019
 numbering: counter
@@ -8,7 +8,8 @@ aspectratio: 169
 header-includes:
   - \usetheme[sectionpage = simple]{metropolis}
   - \usepackage{xcolor}
-
+  - \setmathfont{Fira Math}
+  
 ---
 
 # Background
@@ -166,10 +167,10 @@ Inverted indexes are used in NLP[^3] and search[^4] for quickly finding document
 :::{.column}
 \begin{center}inverse index\end{center}
 
-| tag      | docs                   |
-|----------|------------------------|
-| list     | movies.txt, books.txt  |
-| learning | books.txt, school.txt  |
+| tag      | docs                  |
+|----------|-----------------------|
+| list     | movies.txt, books.txt |
+| learning | books.txt, school.txt |
 :::
 ::::
 
@@ -198,13 +199,54 @@ The library includes a `TagIndex` class which stores the index and inverted inde
 
 **boolean.py**^6^ is used to parse arbitrarily complex tag queries, like:
 
-\begin{center}``(list and learning) or (not work)''\end{center}
+\begin{center}
+“(list and learning) or (not work)”
+\end{center}
 :::
 ::::
-
 
 \footnotetext[5]{https://github.com/bastikr/boolean.py}
 
 \footnotetext[6]{https://github.com/esnme/ultrajson}
 
-## 
+## Features
+
+See `notebooks/features.ipynb`
+
+## Performance
+
+See `notebooks/performance.ipynb`
+
+## Query Parsing: Text to Expressions
+
+The boolean.py library turns plaintext strings with a flexible syntax into nested **expression** objects, each with one or more arguments and an optional operation. E.g. "a or b" is evaluated to 
+
+```python
+OR(Symbol('a'), Symbol('b'))
+```
+
+where a **symbol** is the simplest expression, having no operation at all.
+
+Similarly, a more complex query like "not a or (b and c)" evaluates to 
+
+```python
+OR(
+    NOT(Symbol('a')), 
+    AND(Symbol('b'), Symbol('c'))
+)
+```
+
+## Query Parsing: Expressions to Documents
+
+doctag recurses through expression arguments until it hits a bare symbol, at which point it fetches all documents tagged with that symbol. When all arguments of an operation expression are evaluated, it uses set logic to evaluate the entire expression.
+
+If we let {foo} represent the set of all documents tagged with "foo," we can follow simple set logic to parse morecomplex expressions:
+
+- "a and b" is the set intersection of {a} and {b}
+    - (with short-circuiting if {a} evaluates to the empty set)
+- "a or b" is the set union of {a} and {b}
+- "not a" is the set complement of {a} (all existing tags that are not in {a})
+
+## Links
+
+doctag is on Github: <https://github.com/daturkel/doctag>
