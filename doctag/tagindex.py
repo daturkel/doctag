@@ -20,8 +20,28 @@ class TagIndex:
     def docs(self):
         return set(self.doc_to_tags.keys())
 
+    @property
+    def conflicts(self) -> Set[str]:
+        conflicts = set()
+        for tag, docs in self.tag_to_docs.items():
+            for doc in docs:
+                if tag not in self.doc_to_tags[doc]:
+                    conflicts.add(
+                        f"'{doc}' in tag_to_docs[{tag}] but '{tag}' not in doc_to_tags[{doc}]"
+                    )
+        for doc, tags in self.doc_to_tags.items():
+            for tag in tags:
+                if doc not in self.tag_to_docs[tag]:
+                    conflicts.add(
+                        f"'{tag}' in doc_to_tags[{doc}] but '{doc}' not in tag_to_docs[{tag}]"
+                    )
+        return conflicts
+
     def get_docs(self, tag: str):
-        docs = {doc for doc in self.tag_to_docs[tag]}
+        if tag in self.tags:
+            docs = {doc for doc in self.tag_to_docs[tag]}
+        else:
+            docs = set()
         return docs
 
     def tag(self, docs: Union[str, Iterable[str]], tags: Union[str, Iterable[str]]):
@@ -31,6 +51,10 @@ class TagIndex:
         tags_ = (
             tags if isinstance(tags, Iterable) and not isinstance(tags, str) else [tags]
         )
+        if {"false", "true", "0", "1"} & {tag.lower() for tag in tags_}:
+            raise ValueError(
+                "'true', 'false', '0', and '1' are reserved names and cannot be used as tags."
+            )
         for doc, tag in product(docs_, tags_):
             self.doc_to_tags[doc].add(tag)
             self.tag_to_docs[tag].add(doc)
