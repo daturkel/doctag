@@ -1,31 +1,15 @@
 import boolean
 import sys
 import ujson
-from typing import DefaultDict, Union, List, Iterable, Dict, Any, Tuple, Optional
+from typing import DefaultDict, Union, List, Iterable, Dict, Any, Tuple, Optional, Set
 from collections import defaultdict
-
-
-def parse_tag(tag: str) -> Tuple[str, Optional[str]]:
-    value: Optional[str]  # appease mypy
-    if ":" in tag:
-        sp = tag.split(":",maxsplit=1)
-        try:
-            value = sp[1]
-        except IndexError:
-            value = None
-        tag = sp[0]
-    else:
-        value = None
-    if value == "":
-        value = None
-    return (tag, value)
+from itertools import product
 
 
 class TagIndex:
     def __init__(self):
-        self.tag_to_docs: DefaultDict[str, set] = DefaultDict(set)
-        self.doc_to_tags: DefaultDict[str, set] = DefaultDict(set)
-        self.doc_tag_values: Dict[Tuple[str, str], Any] = {}
+        self.tag_to_docs: DefaultDict[str, Set[str]] = DefaultDict(set)
+        self.doc_to_tags: DefaultDict[str, Set[str]] = DefaultDict(set)
         self.algebra = boolean.BooleanAlgebra()
 
     @property
@@ -37,15 +21,7 @@ class TagIndex:
         return set(self.doc_to_tags.keys())
 
     def get_docs(self, tag: str):
-        tag, value = parse_tag(tag)
-        if value is not None:
-            docs = {
-                doc
-                for doc in self.tag_to_docs[tag]
-                if self.doc_tag_values.get((doc, tag), None) == value
-            }
-        else:
-            docs = {doc for doc in self.tag_to_docs[tag]}
+        docs = {doc for doc in self.tag_to_docs[tag]}
         return docs
 
     def tag(self, docs: Union[str, Iterable[str]], tags: Union[str, Iterable[str]]):
@@ -55,9 +31,9 @@ class TagIndex:
         tags_ = (
             tags if isinstance(tags, Iterable) and not isinstance(tags, str) else [tags]
         )
-        product = ((doc, tag) for doc in docs_ for tag in tags_)
-        for doc, tag in product:
-            self._tag(doc=doc, tag=tag)
+        for doc, tag in product(docs_, tags_):
+            self.doc_to_tags[doc].add(tag)
+            self.tag_to_docs[tag].add(doc)
 
     def untag(self, docs: Union[str, Iterable[str]], tags: Union[str, Iterable[str]]):
         docs_ = (
@@ -66,34 +42,49 @@ class TagIndex:
         tags_ = (
             tags if isinstance(tags, Iterable) and not isinstance(tags, str) else [tags]
         )
-        product = ((doc, tag) for doc in docs_ for tag in tags_)
-        for doc, tag in product:
-            self._untag(doc=doc, tag=tag)
+        for doc, tag in product(docs_, tags_):
+            try:
+                self.doc_to_tags[doc].remove(tag)
+            except KeyError:
+                pass
+            try:
+                self.tag_to_docs[tag].remove(doc)
+            except KeyError:
+                pass
+            if not self.tag_to_docs[tag]:
+                del self.tag_to_docs[tag]
+            if not self.doc_to_tags[doc]:
+                del self.doc_to_tags[doc]
 
-    def merge(self, old_tags: Union[str, Iterable[str]], new_tag: str):
+    def remove_tag(self, tag: str):
+        if tag not in self.tags:
+            raise ValueError(f"Tag '{tag}' not found.")
+        else:
+            self.untag(docs=self.tag_to_docs[tag], tags=tag)
+
+    def merge_tags(self, old_tags: Union[str, Iterable[str]], new_tag: str):
         old_tags_ = old_tags if isinstance(old_tags, list) else [old_tags]
         for old_tag in old_tags_:
-            self._merge(old_tag=old_tag, new_tag=new_tag)
+            self.tag(docs=self.tag_to_docs[old_tag], tags=new_tag)
+            self.remove_tag(old_tag)
 
-    def _merge(self, old_tag: str, new_tag: str):
-        self.tag_to_docs[new_tag].add(self.tag_to_docs[old_tag])
-        self.untag(docs=self.tag_to_docs[old_tag], tags=old_tag)
-
-    def rename_file(self, old_file_name: str, new_file_name: str):
-        if new_file_name in self.docs:
-            raise ValueError(f"Document named '{new_file_name}' already exists.")
+    def rename_doc(self, old_doc_name: str, new_doc_name: str):
+        if new_doc_name in self.docs:
+            raise ValueError(f"Document named '{new_doc_name}' already exists.")
+        elif old_doc_name not in self.docs:
+            raise ValueError(f"Document named '{old_doc_name}' not found.")
         else:
-            self.doc_to_tags[new_file_name] = self.tag_to_docs.pop(old_file_name)
+            self.tag(docs=new_doc_name, tags=self.doc_to_tags[old_doc_name])
+            self.untag(docs=old_doc_name, tags=self.doc_to_tags[old_doc_name])
 
-    def remove_file(self, file_name: str):
-        if file_name not in self.docs:
-            raise ValueError(f"Document '{file_name}' not found.")
+    def remove_doc(self, doc_name: str):
+        if doc_name not in self.docs:
+            raise ValueError(f"Document '{doc_name}' not found.")
         else:
-            self.untag(docs=file_name, tags=self.doc_to_tags[file_name])
-            del self.doc_to_tags[file_name]
+            self.untag(docs=doc_name, tags=self.doc_to_tags[doc_name])
 
     def to_json(self, file_name: str):
-        serial = {"doc_tag_values": self.doc_tag_values}
+        serial = dict()
         dtt_size = sys.getsizeof(self.doc_to_tags)
         ttd_size = sys.getsizeof(self.tag_to_docs)
         ttd_bigger = ttd_size >= dtt_size
@@ -109,7 +100,6 @@ class TagIndex:
         with open(file_name, "r") as from_file:
             serial = ujson.load(from_file)
             ti = TagIndex()
-            ti.doc_tag_values = serial["doc_tag_values"]
             if "doc_to_tags" in serial.keys():
                 ti.doc_to_tags.update(
                     {str(doc): set(tags) for doc, tags in serial["doc_to_tags"].items()}
@@ -129,23 +119,6 @@ class TagIndex:
                     "File does not contain 'tag_to_docs' or 'doc_to_tags' index."
                 )
         return ti
-
-    def _tag(self, doc: str, tag: str):
-        value: Optional[str] = None
-        tag, value = parse_tag(tag)
-        self.doc_to_tags[doc].add(tag)
-        self.tag_to_docs[tag].add(doc)
-        if value is not None:
-            self.doc_tag_values[(doc, tag)] = value
-
-    def _untag(self, doc: str, tag: str):
-        tag, value = parse_tag(tag)
-        self.doc_to_tags[doc].remove(tag)
-        self.tag_to_docs[tag].remove(doc)
-        if not self.tag_to_docs[tag]:
-            del self.tag_to_docs[tag]
-        if value is not None:
-            del self.doc_tag_values[(doc, tag)]
 
     def query(self, query=str) -> set:
         return self._parse_query(query)
