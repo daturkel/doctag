@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="doctag",
-    version="0.0.1",
+    version="0.0.2",
     description="An interface for associating objects with descriptive tags.",
     long_description=open("README.md").read(),
     install_requires=["boolean.py>=3.6", "ujson>=1.35"],
