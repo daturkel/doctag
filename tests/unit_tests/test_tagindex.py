@@ -1,6 +1,6 @@
-from doctag import TagIndex
-from boolean.boolean import ParseError
 import pytest
+from boolean.boolean import ParseError
+from doctag import TagIndex
 
 ## test utilities
 

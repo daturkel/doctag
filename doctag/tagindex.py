@@ -1,9 +1,10 @@
-import boolean
 import sys
-import ujson
-from typing import DefaultDict, Union, List, Iterable, Dict, Any, Tuple, Optional, Set
 from collections import defaultdict
 from itertools import product
+from typing import Any, DefaultDict, Dict, Iterable, List, Optional, Set, Tuple, Union
+
+import boolean
+import ujson
 
 
 class TagIndex:

@@ -1,5 +1,4 @@
 import pytest
-
 from doctag import TagIndex
 
 
