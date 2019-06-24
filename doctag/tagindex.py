@@ -1,17 +1,21 @@
+import os
 import sys
 from collections import defaultdict
 from itertools import product
+from pathlib import Path
 from typing import Any, DefaultDict, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import boolean
 import ujson
+from doctag_cli.metamarkdown import MetaMarkdown
 
 
 class TagIndex:
-    def __init__(self):
+    def __init__(self, at: Optional[str] = None):
         self.tag_to_docs: DefaultDict[str, Set[str]] = DefaultDict(set)
         self.doc_to_tags: DefaultDict[str, Set[str]] = DefaultDict(set)
         self.algebra = boolean.BooleanAlgebra()
+        self.at = at
 
     @property
     def tags(self):
@@ -28,13 +32,13 @@ class TagIndex:
             for doc in docs:
                 if tag not in self.doc_to_tags[doc]:
                     conflicts.add(
-                        f"'{doc}' in tag_to_docs[{tag}] but '{tag}' not in doc_to_tags[{doc}]"
+                        f"'{doc}' in tag_to_docs['{tag}'] but '{tag}' not in doc_to_tags['{doc}']"
                     )
         for doc, tags in self.doc_to_tags.items():
             for tag in tags:
                 if doc not in self.tag_to_docs[tag]:
                     conflicts.add(
-                        f"'{tag}' in doc_to_tags[{doc}] but '{doc}' not in tag_to_docs[{tag}]"
+                        f"'{tag}' in doc_to_tags['{doc}'] but '{doc}' not in tag_to_docs['{tag}']"
                     )
         return conflicts
 
@@ -56,7 +60,12 @@ class TagIndex:
             raise ValueError(
                 "'true', 'false', '0', and '1' are reserved names and cannot be used as tags."
             )
-        for doc, tag in product(docs_, tags_):
+        tags_ = self._tag_validator(tags_)
+        self._tag(docs=docs_, tags=tags_)
+        self._tag_callback(docs=docs_, tags=tags_)
+
+    def _tag(self, docs: Iterable[str], tags: Iterable[str]):
+        for doc, tag in product(docs, tags):
             self.doc_to_tags[doc].add(tag)
             self.tag_to_docs[tag].add(doc)
 
@@ -80,6 +89,7 @@ class TagIndex:
                 del self.tag_to_docs[tag]
             if not self.doc_to_tags[doc]:
                 del self.doc_to_tags[doc]
+        self._untag_callback(docs=docs_, tags=tags_)
 
     def remove_tag(self, tag: str):
         if tag not in self.tags:
@@ -108,7 +118,11 @@ class TagIndex:
         else:
             self.untag(docs=doc_name, tags=self.doc_to_tags[doc_name])
 
-    def to_json(self, file_name: str):
+    def to_json(self, at: Optional[str] = None):
+        if at is None and self.at is not None:
+            at = self.at
+        elif self.at is None and self.at is not None:
+            self.at = at
         serial = dict()
         dtt_size = sys.getsizeof(self.doc_to_tags)
         ttd_size = sys.getsizeof(self.tag_to_docs)
@@ -117,14 +131,14 @@ class TagIndex:
             serial["doc_to_tags"] = self.doc_to_tags
         else:
             serial["tag_to_docs"] = self.tag_to_docs
-        with open(file_name, "w") as to_file:
+        with open(str(at), "w") as to_file:
             ujson.dump(serial, to_file)
 
     @classmethod
-    def from_json(cls, file_name: str) -> "TagIndex":
-        with open(file_name, "r") as from_file:
+    def from_json(cls, at: str) -> "TagIndex":
+        with open(at, "r") as from_file:
             serial = ujson.load(from_file)
-            ti = TagIndex()
+            ti = TagIndex(at=at)
             if "doc_to_tags" in serial.keys():
                 ti.doc_to_tags.update(
                     {str(doc): set(tags) for doc, tags in serial["doc_to_tags"].items()}
@@ -199,3 +213,23 @@ class TagIndex:
         else:
             docs_with_tag = self._parse_expression(operator=arg.operator, args=arg.args)
         return self.docs - docs_with_tag
+
+    def _tag_callback(self, docs, tags):
+        pass
+
+    def _untag_callback(self, docs, tags):
+        pass
+
+    def _tag_validator(self, tags: Iterable[str]) -> Iterable[str]:
+        return tags
+
+    def __enter__(self):
+        if not self.at:
+            raise FileNotFoundError(
+                f"{type(self).__name__} missing a read/write location 'at'"
+            )
+        return self
+
+    def __exit__(self, etype, evalue, traceback):
+        if not etype:
+            self.to_json()
