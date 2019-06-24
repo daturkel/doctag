@@ -24,6 +24,10 @@ def no_conflicts(ti: TagIndex):
     assert not ti.conflicts
 
 
+def yes_conflicts(ti: TagIndex):
+    assert ti.conflicts
+
+
 ## tests
 
 
@@ -77,6 +81,12 @@ def test_untag_a(simple_ti: TagIndex):
     no_doc(ti=simple_ti, doc="doc_2")
     no_tag(ti=simple_ti, tag="tag_c")
     assert simple_ti.tag_to_docs["tag_a"] == {"doc_1"}
+    simple_ti.untag(docs="doc_3", tags="fake_tag")
+    no_tag(ti=simple_ti, tag="fake_tag")
+    assert simple_ti.doc_to_tags["doc_3"] == {"tag_d"}
+    simple_ti.untag(docs="doc_99", tags="tag_a")
+    no_doc(ti=simple_ti, doc="doc_99")
+    assert simple_ti.tag_to_docs["tag_a"] == {"doc_1"}
     no_conflicts(ti=simple_ti)
 
 
@@ -97,6 +107,9 @@ def test_remove_tag(simple_ti: TagIndex):
     no_tag(ti=simple_ti, tag="tag_a")
     assert simple_ti.doc_to_tags["doc_1"] == {"tag_b"}
     assert simple_ti.doc_to_tags["doc_2"] == {"tag_b", "tag_c"}
+    with pytest.raises(ValueError):
+        simple_ti.remove_tag(tag="tag_99")
+    no_tag(ti=simple_ti, tag="tag_99")
     no_conflicts(ti=simple_ti)
 
 
@@ -128,9 +141,14 @@ def test_rename_doc(simple_ti: TagIndex):
     assert simple_ti.doc_to_tags["doc_4"] == {"tag_a", "tag_b", "tag_c"}
     no_doc(ti=simple_ti, doc="doc_2")
     with pytest.raises(ValueError):
+        # new doc name already exists
         simple_ti.rename_doc(old_doc_name="doc_99", new_doc_name="doc_4")
     with pytest.raises(ValueError):
+        # new doc name already exists
         simple_ti.rename_doc(old_doc_name="doc_2", new_doc_name="doc_3")
+    with pytest.raises(ValueError):
+        # old doc name doesn't exist
+        simple_ti.rename_doc(old_doc_name="doc_99", new_doc_name="doc_100")
     no_conflicts(ti=simple_ti)
 
 
@@ -203,3 +221,17 @@ def test_query_complex(simple_ti: TagIndex):
     assert simple_ti.query("tag_c or not (tag_a and tag_b)") == {"doc_2", "doc_3"}
     assert simple_ti.query("tag_c or not tag_a and tag_b") == {"doc_2"}
     no_conflicts(ti=simple_ti)
+
+
+def test_conflicts_a(simple_ti: TagIndex):
+    simple_ti.tag_to_docs["tag_99"] = {"doc_a"}
+    assert simple_ti.conflicts == {
+        "'doc_a' in tag_to_docs['tag_99'] but 'tag_99' not in doc_to_tags['doc_a']"
+    }
+    yes_conflicts(ti=simple_ti)
+    simple_ti.doc_to_tags["doc_z"] = {"tag_1"}
+    assert simple_ti.conflicts == {
+        "'doc_a' in tag_to_docs['tag_99'] but 'tag_99' not in doc_to_tags['doc_a']",
+        "'tag_1' in doc_to_tags['doc_z'] but 'doc_z' not in tag_to_docs['tag_1']",
+    }
+    yes_conflicts(ti=simple_ti)
