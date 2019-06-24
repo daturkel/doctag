@@ -5,7 +5,7 @@ from typing import Iterable, List, Optional
 import ujson
 from doctag_cli.metamarkdown import MetaMarkdown
 
-from . import TagIndex
+from .tagindex import TagIndex
 
 
 class FileTagIndex(TagIndex):

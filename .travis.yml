@@ -6,4 +6,5 @@ install:
   - pip install .[test]
 script:
     - pytest
+    - python run_mypy.py
     - coveralls
